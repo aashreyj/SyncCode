@@ -36,9 +36,26 @@ const EditorPage = () => {
 
   // Function to handle code changes - will be passed to Editor
 
+    useEffect(() => {
+      const handleBeforeUnload = () => {
+        // Emit a leaveRoom event just before the user closes the window
+        if (socketRef.current) {
+          socketRef.current.emit("leave", {
+            roomId,
+            username: location.state?.username,
+          });
+        }
+      };
+
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      };
+    }, []);
+
   const handleCodeChange = (newCode) => {
     setCode(newCode);
-
     codeRef.current = newCode;
   };
   useEffect(() => {
@@ -116,15 +133,34 @@ const EditorPage = () => {
     }
   }
 
-  function leaveRoom(roomId) {
-    if (socketRef.current) {
-      socketRef.current.emit("leave", {
-        roomId,
-        username: location.state?.username,
-      });
-    }
-    reactNavigator("/");
-  }
+    async function leaveRoom(roomId) {
+        if (socketRef.current) {
+        socketRef.current.emit("leave", {
+            roomId,
+            username: location.state?.username,
+        });
+        }
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/sessions/leave/${roomId}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to leave session: ${response.status}`);
+        }
+
+        const data = await response.json();
+        reactNavigator("/");
+      } catch (error) {
+        console.error("Error leaving session:", error);
+      }
+    };
 
   function changeLanguage(el) {
     setLang(el.target.value);
